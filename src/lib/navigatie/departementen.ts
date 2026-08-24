@@ -8,10 +8,12 @@ export type DepartementProperties = {
 export type DepartementFeature = Feature<Geometry, DepartementProperties>;
 export type DepartementGeoJSON = FeatureCollection<Geometry, DepartementProperties>;
 
-// Open-data bron: gregoiredavid/france-geojson (departementsgrenzen, alle 96
-// metropolitane departementen, ~3.4MB). Geverifieerd: properties zijn "code" en "nom".
-const DEPARTEMENTEN_GEOJSON_URL =
-  "https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements.geojson";
+// Lokaal gebundeld, vereenvoudigd bestand (public/data/departementen.geojson):
+// alle 96 metropolitane departementen, afgeleid van gregoiredavid/france-geojson
+// en vereenvoudigd met @turf/simplify (tolerance 0.01, ~3.4MB -> ~206KB).
+// Zie scripts/simplify-departementen.mjs voor hoe het bestand is gegenereerd.
+// Same-origin static asset: geen externe fetch, geen netwerkvertraging tijdens het rijden.
+const DEPARTEMENTEN_GEOJSON_URL = "/data/departementen.geojson";
 
 let gecachteGrenzen: DepartementGeoJSON | null = null;
 
@@ -20,7 +22,7 @@ export async function haalOfficiëleDepartementsGrenzen(): Promise<DepartementGe
 
   try {
     const response = await fetch(DEPARTEMENTEN_GEOJSON_URL);
-    if (!response.ok) throw new Error("Fout bij laden van Franse overheidsgrenzen");
+    if (!response.ok) throw new Error("Fout bij laden van departementsgrenzen");
 
     const data = (await response.json()) as DepartementGeoJSON;
     gecachteGrenzen = data;
