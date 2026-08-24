@@ -8,9 +8,8 @@ export type GeoJsonPolygon = {
 
 export type Departement = {
   code: string;
-  naam: string;
   grenzen: GeoJsonPolygon;
 };
 
-// TODO: vullen met echte GeoJSON-data per departement.
+// TODO: vullen met echte GeoJSON-grenzen per departement.
 export const departementen: Departement[] = [];
