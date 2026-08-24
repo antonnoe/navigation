@@ -1,14 +1,40 @@
 'use client';
 import React, { useState } from 'react';
+import { SpeechEngine } from './SpeechEngine';
+import { streekVerhalen } from '@/lib/navigatie/streek-verhalen';
 
 interface PreDrivePanelProps {
   onRouteSelected: (route: string) => void;
 }
 
+// Vast voorbeeld-departement voor de testknop - altijd aanwezig, ongeacht waar
+// de gebruiker straks daadwerkelijk gaat rijden.
+const VOORBEELD_DEPARTEMENT_CODE = '62';
+
 export default function PreDrivePanel({ onRouteSelected }: PreDrivePanelProps) {
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(false);
   const [advice, setAdvice] = useState<{ status: 'safe' | 'warning'; text: string; alternative?: string } | null>(null);
+  const [toonUitleg, setToonUitleg] = useState(false);
+
+  const speelDemoAf = () => {
+    SpeechEngine.speakMixedSentence([
+      {
+        text: 'Zo klinkt de gids onderweg. Dit is de veiligheidsstem: kort en duidelijk, voor navigatie en waarschuwingen.',
+        lang: 'nl-NL',
+        priority: 'safety',
+      },
+    ], 'toergids');
+
+    const voorbeeld = streekVerhalen[VOORBEELD_DEPARTEMENT_CODE];
+    if (voorbeeld) {
+      SpeechEngine.speakMixedSentence([
+        { text: 'En dit is de rustigere toergids-stem, voor als u bijvoorbeeld het departement', lang: 'nl-NL', priority: 'info' },
+        { text: voorbeeld.naam, lang: 'fr-FR', priority: 'info' },
+        { text: `binnenrijdt. ${voorbeeld.verhaal}`, lang: 'nl-NL', priority: 'info' },
+      ], 'toergids');
+    }
+  };
 
   const checkRouteSecurity = () => {
     if (!destination) return;
@@ -59,7 +85,7 @@ export default function PreDrivePanel({ onRouteSelected }: PreDrivePanelProps) {
         </div>
 
         {advice && (
-          <div className={`rounded-2xl p-6 border-2 shadow-sm ${advice.status === 'warning' ? 'bg-amber-50 border-amber-500' : 'bg-emerald-50 border-emerald-500'}`}>
+          <div className={`rounded-2xl p-6 border-2 shadow-sm mb-6 ${advice.status === 'warning' ? 'bg-amber-50 border-amber-500' : 'bg-emerald-50 border-emerald-500'}`}>
             <h3 className="text-xl font-bold mb-2 flex items-center">
               {advice.status === 'warning' ? '⚠️ Live Reisadvies' : '✅ Route Veilig'}
             </h3>
@@ -69,6 +95,37 @@ export default function PreDrivePanel({ onRouteSelected }: PreDrivePanelProps) {
             )}
           </div>
         )}
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <button
+            onClick={() => setToonUitleg((v) => !v)}
+            className="w-full p-5 text-left flex justify-between items-center"
+          >
+            <span className="text-lg font-bold text-slate-800">ℹ️ Wat maakt deze app anders?</span>
+            <span className="text-xl text-slate-400">{toonUitleg ? '−' : '+'}</span>
+          </button>
+
+          {toonUitleg && (
+            <div className="px-5 pb-5 space-y-4">
+              <ul className="space-y-2 text-base text-slate-700 leading-relaxed list-disc pl-5">
+                <li>Twee stemmen: een korte, duidelijke stem voor veiligheid en navigatie, en een rustige toergids-stem voor streekverhalen die direct plaatsmaakt zodra het echt belangrijk wordt.</li>
+                <li>Franse plaatsnamen worden netjes op z&apos;n Frans uitgesproken, niet fonetisch verbasterd.</li>
+                <li>Voor elk van de 96 Franse departementen een eigen Nederlands verhaal over de streek.</li>
+                <li>Grote, seniorvriendelijke knoppen - geen knijpgebaren nodig om in of uit te zoomen.</li>
+              </ul>
+
+              <button
+                onClick={speelDemoAf}
+                className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl text-base active:scale-98 transition-transform"
+              >
+                🔊 Test de gids (zonder te rijden)
+              </button>
+              <p className="text-sm text-slate-500">
+                Speelt een kort voorbeeld af zodat u de app kunt horen voordat u de weg op gaat.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {advice && (

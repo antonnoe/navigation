@@ -49,8 +49,15 @@ class SpeechEngineService {
 
   private getVoiceForLang(lang: string): SpeechSynthesisVoice | null {
     if (typeof window === 'undefined') return null;
-    const voices = window.speechSynthesis.getVoices();
-    return voices.find((v) => v.lang.startsWith(lang)) || null;
+    const kandidaten = window.speechSynthesis.getVoices().filter((v) => v.lang.startsWith(lang));
+    if (kandidaten.length === 0) return null;
+
+    // "Compact" is iOS/Safari's naam voor de laag-kwaliteit, robotachtig
+    // klinkende systeemstem die standaard vaak als enige beschikbaar is totdat
+    // de gebruiker een "Enhanced"/"Premium" stem downloadt. Kies die liever niet
+    // als er een alternatief is.
+    const nietCompact = kandidaten.find((v) => !v.name.toLowerCase().includes('compact'));
+    return nietCompact ?? kandidaten[0];
   }
 
   public stopAll(): void {

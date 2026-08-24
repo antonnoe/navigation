@@ -19,7 +19,6 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
   const [currentRegion, setCurrentRegion] = useState('Zoeken...');
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
-  const [bisonAlert, setBisonAlert] = useState<string | null>(null);
 
   // Refs voor Leaflet DOM-instanties en afspeel-logs
   const mapRef = useRef<LeafletMap | null>(null);
@@ -27,41 +26,16 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
   const geoWatchIdRef = useRef<number | null>(null);
   const afgespeeldeRegios = useRef<string[]>([]);
   const afgespeeldeEvents = useRef<string[]>([]);
-  const afgespeeldeBisonAlerts = useRef<string[]>([]);
 
   useEffect(() => {
-    // Controleer live Bison Futé Incidenten
-    // TODO: dit is nog een gesimuleerde/gemockte melding, geen echte koppeling met
-    // de open-data-feed van de Franse verkeerscentrale (data.gouv.fr).
-    const controleerBisonFuteLive = async () => {
-      try {
-        const mockIncident = {
-          id: "bison-10492",
-          weg: "A26",
-          omschrijving: "Verzadigd verkeer over vier kilometer vanwege wegwerkzaamheden bij het knooppunt.",
-          verhaalNL: "Bison Futé meldt een actuele file van vier kilometer op de A26 vanwege wegwerkzaamheden. Verwachte vertraging is twintig minuten.",
-        };
-
-        if (!afgespeeldeBisonAlerts.current.includes(mockIncident.id)) {
-          afgespeeldeBisonAlerts.current.push(mockIncident.id);
-          setBisonAlert(`🚨 Verkeer (${mockIncident.weg}): ${mockIncident.omschrijving}`);
-
-          // De Safety-stem heeft altijd voorrang bij acute verkeershinder
-          SpeechEngine.speakMixedSentence([
-            { text: "Let op! ", lang: "nl-NL", priority: "safety" },
-            { text: mockIncident.verhaalNL, lang: "nl-NL", priority: "safety" }
-          ], preferences.audioMode);
-        }
-      } catch (error) {
-        console.error("Bison Futé API fout:", error);
-      }
-    };
-
-    // Welkomstbericht bij start van de rit
+    // Welkomstbericht bij start van de rit. De bestemming is vrije tekst die de
+    // gebruiker zelf typt (dit is een FR<->NL-tool, dus niet per se een Franse
+    // plaatsnaam) - we kunnen de taal ervan niet betrouwbaar bepalen, dus lezen
+    // 'm voor in het Nederlands. Alleen departementsnamen uit onze eigen
+    // streekVerhalen-data zijn gegarandeerd Frans en krijgen de Franse stem
+    // (zie hieronder bij B).
     SpeechEngine.speakMixedSentence([
-      { text: 'Navigatie gestart, richting', lang: 'nl-NL', priority: 'safety' },
-      { text: destination, lang: 'fr-FR', priority: 'safety' },
-      { text: 'Veiligheid staat voorop.', lang: 'nl-NL', priority: 'safety' }
+      { text: `Navigatie gestart, richting ${destination}. Veiligheid staat voorop.`, lang: 'nl-NL', priority: 'safety' }
     ], preferences.audioMode);
 
     const startKaartEnGPS = async () => {
@@ -88,7 +62,6 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
           setGpsError(null);
 
           // A. Leaflet instantie aanmaken of positie updaten
-          const eersteLocatiefix = !mapRef.current;
           if (!mapRef.current) {
             // zoomControl: false dwingt ons om onze eigen grote seniorenknoppen te gebruiken
             mapRef.current = L.map('leaflet-map-container', { zoomControl: false }).setView([latitude, longitude], 14);
@@ -134,13 +107,11 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
             ], preferences.audioMode);
           }
 
-          // D. Live data-pijplijn controleren: Realtime Bison Futé verkeer
-          // Niet op de allereerste locatiefix: die zou als safety-melding het
-          // welkomstbericht (ook safety) meteen afkappen, nog voor het goed en
-          // wel begonnen is.
-          if (!eersteLocatiefix && (preferences.radioCast || preferences.audioMode !== 'stil')) {
-            await controleerBisonFuteLive();
-          }
+          // D. Realtime Bison Futé-verkeer: nog niet gekoppeld aan een echte bron.
+          // TODO: hier de live open-data-feed van de Franse verkeerscentrale
+          // (data.gouv.fr) aansluiten. Bewust geen gesimuleerde/gemockte melding
+          // meer - die klonk als een echte waarschuwing terwijl het incident niet
+          // op de daadwerkelijke route van de gebruiker lag.
         },
         (error) => {
           console.error("GPS Verbindingsfout:", error);
@@ -165,7 +136,7 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
       }
       SpeechEngine.stopAll();
     };
-  }, [destination, preferences.audioMode, preferences.radioCast]);
+  }, [destination, preferences.audioMode]);
 
   const zoomIn = () => { mapRef.current?.zoomIn(); };
   const zoomOut = () => { mapRef.current?.zoomOut(); };
@@ -173,7 +144,7 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
   return (
     <div className="relative flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
 
-      {/* BOVENBALK: Route & Live Bison Indicator */}
+      {/* BOVENBALK: Route */}
       <div className="bg-blue-950 p-5 shadow-lg border-b border-blue-900 z-20 flex justify-between items-center">
         <div className="truncate mr-4">
           <span className="text-slate-400 text-sm font-bold uppercase tracking-wider block">Actieve Route</span>
@@ -186,18 +157,18 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
 
       {/* MIDDEN: Leaflet Kaart en Overlays */}
       <div className="flex-1 relative z-10">
-        <div id="leaflet-map-container" className="w-full h-full bg-slate-800" />
+        {/* relative + expliciete z-0 (i.p.v. auto) is bewust: zonder eigen z-index
+            vormt deze div geen eigen stacking-context, waardoor Leaflet's interne
+            lagen (.leaflet-top/.leaflet-bottom, z-index 1000 voor de controls)
+            "lekken" naar hetzelfde niveau als de meldingen-overlay hieronder en
+            die na de eerste render alsnog bedekken. */}
+        <div id="leaflet-map-container" className="relative z-0 w-full h-full bg-slate-800" />
 
         {/* DRINGENDE WAARSCHUWINGEN OVERLAY (BISON FUTÉ) */}
         <div className="absolute top-4 left-4 right-4 z-30 space-y-2 pointer-events-none">
           {gpsError && (
             <p className="text-amber-400 bg-amber-950/95 px-4 py-2.5 rounded-xl border border-amber-900 font-bold text-sm shadow-xl animate-pulse">
               ⚠️ {gpsError}
-            </p>
-          )}
-          {bisonAlert && (
-            <p className="text-white bg-red-950/95 px-4 py-2.5 rounded-xl border border-red-700 font-medium text-sm shadow-xl border-l-8 border-l-red-500">
-              {bisonAlert}
             </p>
           )}
           {!gpsError && currentCoords && (
