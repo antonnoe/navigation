@@ -59,9 +59,9 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
 
     // Welkomstbericht bij start van de rit
     SpeechEngine.speakMixedSentence([
-      { text: 'Navigatie actief richting ', lang: 'nl-NL', priority: 'safety' },
+      { text: 'Navigatie gestart, richting', lang: 'nl-NL', priority: 'safety' },
       { text: destination, lang: 'fr-FR', priority: 'safety' },
-      { text: '. Veiligheid staat voorop.', lang: 'nl-NL', priority: 'safety' }
+      { text: 'Veiligheid staat voorop.', lang: 'nl-NL', priority: 'safety' }
     ], preferences.audioMode);
 
     const startKaartEnGPS = async () => {
@@ -88,6 +88,7 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
           setGpsError(null);
 
           // A. Leaflet instantie aanmaken of positie updaten
+          const eersteLocatiefix = !mapRef.current;
           if (!mapRef.current) {
             // zoomControl: false dwingt ons om onze eigen grote seniorenknoppen te gebruiken
             mapRef.current = L.map('leaflet-map-container', { zoomControl: false }).setView([latitude, longitude], 14);
@@ -113,9 +114,9 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
               setCurrentRegion(`${streek.naam} (${deptCode})`);
 
               SpeechEngine.speakMixedSentence([
-                { text: 'U rijdt nu binnen in het departement ', lang: 'nl-NL', priority: 'info' },
+                { text: 'U rijdt nu het departement', lang: 'nl-NL', priority: 'info' },
                 { text: streek.naam, lang: 'fr-FR', priority: 'info' },
-                { text: `. ${streek.verhaal}`, lang: 'nl-NL', priority: 'info' }
+                { text: `binnen. ${streek.verhaal}`, lang: 'nl-NL', priority: 'info' }
               ], preferences.audioMode);
             }
           } else {
@@ -134,7 +135,10 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
           }
 
           // D. Live data-pijplijn controleren: Realtime Bison Futé verkeer
-          if (preferences.radioCast || preferences.audioMode !== 'stil') {
+          // Niet op de allereerste locatiefix: die zou als safety-melding het
+          // welkomstbericht (ook safety) meteen afkappen, nog voor het goed en
+          // wel begonnen is.
+          if (!eersteLocatiefix && (preferences.radioCast || preferences.audioMode !== 'stil')) {
             await controleerBisonFuteLive();
           }
         },
