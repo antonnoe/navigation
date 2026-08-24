@@ -40,21 +40,25 @@ export default function NavigationMap({ preferences, destination, onEmergency }:
         setCurrentCoords({ lat: latitude, lng: longitude });
         setGpsError(null);
 
-        // A. Check Departement (Streekinformatie)
-        const deptCode = zoekDepartement(longitude, latitude);
-        if (deptCode) {
-          const streek = streekVerhalen[deptCode];
-          if (streek && !afgespeeldeRegios.current.includes(deptCode)) {
-            afgespeeldeRegios.current.push(deptCode);
-            setCurrentRegion(`${streek.naam} (${deptCode})`);
+        // A. Check Departement (Streekinformatie) - async, want de landelijke
+        // grenzen worden dynamisch opgehaald (zie lib/navigatie/departementen.ts)
+        const verwerkLocatie = async () => {
+          const deptCode = await zoekDepartement(longitude, latitude);
+          if (deptCode) {
+            const streek = streekVerhalen[deptCode];
+            if (streek && !afgespeeldeRegios.current.includes(deptCode)) {
+              afgespeeldeRegios.current.push(deptCode);
+              setCurrentRegion(`${streek.naam} (${deptCode})`);
 
-            SpeechEngine.speakMixedSentence([
-              { text: 'U rijdt nu binnen in het departement ', lang: 'nl-NL', priority: 'info' },
-              { text: streek.naam, lang: 'fr-FR', priority: 'info' },
-              { text: `. ${streek.verhaal}`, lang: 'nl-NL', priority: 'info' }
-            ], preferences.audioMode);
+              SpeechEngine.speakMixedSentence([
+                { text: 'U rijdt nu binnen in het departement ', lang: 'nl-NL', priority: 'info' },
+                { text: streek.naam, lang: 'fr-FR', priority: 'info' },
+                { text: `. ${streek.verhaal}`, lang: 'nl-NL', priority: 'info' }
+              ], preferences.audioMode);
+            }
           }
-        }
+        };
+        verwerkLocatie();
 
         // B. Check Wekelijkse Events (Markten / Brocantes in de buurt)
         const naderendEvent = zoekNaderendEvent(longitude, latitude);

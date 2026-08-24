@@ -1,38 +1,48 @@
-import { booleanPointInPolygon, distance, multiPolygon, point, polygon } from "@turf/turf";
-import type { Feature, Point } from "geojson";
-import { departementen, type Departement } from "./departementen";
-import { events, type NavigatieEvent } from "./events";
+import * as turf from '@turf/turf';
+import type { Feature, MultiPolygon, Polygon } from 'geojson';
+import { haalOfficiëleDepartementsGrenzen, type DepartementFeature } from './departementen';
+import { wekelelijkseEvents, type WekelijksEvent } from './events';
 
-const NADERING_RADIUS_KM = 5;
+const NADERING_RADIUS_KM = 3.0;
 
-function valtBinnenDepartement(positie: Feature<Point>, departement: Departement): boolean {
-  if (departement.grenzen.type === "Polygon") {
-    return booleanPointInPolygon(positie, polygon(departement.grenzen.coordinates as number[][][]));
-  }
-  return booleanPointInPolygon(positie, multiPolygon(departement.grenzen.coordinates as number[][][][]));
+function isPolygonFeature(
+  feature: DepartementFeature
+): feature is Feature<Polygon | MultiPolygon, DepartementFeature['properties']> {
+  return feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon';
 }
 
-export function zoekDepartement(longitude: number, latitude: number): string | null {
-  const positie = point([longitude, latitude]);
+// Controleer exact in welk van de 96 departementen de auto rijdt
+export async function zoekDepartement(lng: number, lat: number): Promise<string | null> {
+  const grenzenData = await haalOfficiëleDepartementsGrenzen();
+  if (!grenzenData) return null;
 
-  for (const departement of departementen) {
-    if (valtBinnenDepartement(positie, departement)) {
-      return departement.code;
+  const punt = turf.point([lng, lat]);
+
+  for (const feature of grenzenData.features) {
+    if (!isPolygonFeature(feature)) continue;
+    if (turf.booleanPointInPolygon(punt, feature)) {
+      return feature.properties.code; // Geeft exact de 2-cijferige code terug (bijv. "60" voor Oise)
     }
   }
-
   return null;
 }
 
-export function zoekNaderendEvent(longitude: number, latitude: number): NavigatieEvent | null {
-  const positie = point([longitude, latitude]);
+// Controleer op naderende zaterdagmarkten
+export function zoekNaderendEvent(lng: number, lat: number): WekelijksEvent | null {
+  const autoPunt = turf.point([lng, lat]);
+  const nu = new Date();
+  const huidigeDag = nu.getDay(); // 0 = Zondag, 6 = Zaterdag
+  const huidigeTijd = nu.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
 
-  for (const event of events) {
-    const eventPositie = point([event.longitude, event.latitude]);
-    if (distance(positie, eventPositie, { units: "kilometers" }) <= NADERING_RADIUS_KM) {
-      return event;
+  for (const event of wekelelijkseEvents) {
+    if (event.dagVanDeWeek === huidigeDag && huidigeTijd >= event.startTijd && huidigeTijd <= event.eindTijd) {
+      const eventPunt = turf.point(event.coordinaten);
+      const afstand = turf.distance(autoPunt, eventPunt, { units: 'kilometers' });
+
+      if (afstand <= NADERING_RADIUS_KM) {
+        return event;
+      }
     }
   }
-
   return null;
 }

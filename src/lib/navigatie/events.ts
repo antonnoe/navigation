@@ -1,16 +1,15 @@
 // Wekelijkse markten en brocantes onderweg
 
-export type NavigatieEvent = {
+export type WekelijksEvent = {
   id: string;
   dorp: string;
   departementCode: string;
-  latitude: number;
-  longitude: number;
-  weekdag: "ma" | "di" | "wo" | "do" | "vr" | "za" | "zo";
-  starttijd: string;
-  eindtijd: string;
+  coordinaten: [number, number]; // [lng, lat]
+  dagVanDeWeek: number; // 0 = zondag ... 6 = zaterdag
+  startTijd: string; // "HH:MM"
+  eindTijd: string; // "HH:MM"
   verhaal: string;
 };
 
 // TODO: vullen met echte marktdata (coördinaten + verhaal) per plaats.
-export const events: NavigatieEvent[] = [];
+export const wekelelijkseEvents: WekelijksEvent[] = [];
